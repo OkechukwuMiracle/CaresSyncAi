@@ -29,7 +29,7 @@ const Login = () => {
     try {
       const result = await signIn(formData.email, formData.password);
       if (result.success) {
-        // 👇 Redirect to dashboard on success
+        // Redirect to dashboard on success
         navigate('/dashboard');
       }
       // else, error is handled by AuthContext

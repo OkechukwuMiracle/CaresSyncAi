@@ -3,6 +3,38 @@ const supabase = require('../config/database');
 const { analyzePatientResponse } = require('../config/openai');
 const router = express.Router();
 
+// Public endpoint to fetch minimal reminder details for patient portal
+router.get('/reminder/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const { data: reminder, error } = await supabase
+      .from('reminders')
+      .select(`
+        id,
+        message,
+        scheduled_date,
+        patients ( id, name )
+      `)
+      .eq('id', id)
+      .single();
+
+    if (error || !reminder) {
+      return res.status(404).json({ error: 'Reminder not found' });
+    }
+
+    res.json({
+      id: reminder.id,
+      message: reminder.message,
+      scheduled_date: reminder.scheduled_date,
+      patient: reminder.patients ? { id: reminder.patients.id, name: reminder.patients.name } : null
+    });
+  } catch (err) {
+    console.error('Fetch reminder details error:', err);
+    res.status(500).json({ error: 'Failed to fetch reminder details' });
+  }
+});
+
 // Public endpoint for patients to submit responses
 router.post('/submit', async (req, res) => {
   try {

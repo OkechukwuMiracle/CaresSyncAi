@@ -97,6 +97,8 @@ CareSync AI is a comprehensive SaaS platform that helps healthcare professionals
    REACT_APP_PAYSTACK_PUBLIC_KEY=your_paystack_public_key_here
    ```
 
+   Create `client/.env` manually ( `.env` files are usually gitignored) and copy these variables. Do not commit secrets.
+
 4. **Set up the database**
    ```bash
    # Run the SQL schema in your Supabase SQL editor

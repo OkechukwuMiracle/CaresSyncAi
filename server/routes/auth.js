@@ -127,6 +127,8 @@ router.post('/logout', authenticateUser, async (req, res) => {
 // Get current user profile
 router.get('/profile', authenticateUser, async (req, res) => {
   try {
+    console.log("AUTH USER:", req.user);
+    console.log("AUTH CLINIC:", req.clinic);
     res.json({
       user: req.user,
       clinic: req.clinic

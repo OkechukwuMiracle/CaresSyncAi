@@ -23,12 +23,20 @@ const PatientPortal = () => {
 
   const fetchReminderDetails = async (id) => {
     try {
-      // In a real implementation, you would fetch reminder details
-      // For now, we'll use placeholder data
-      setPatientName('Patient');
-      setReminderMessage('How are you feeling after your recent visit? Please let us know about any symptoms or concerns.');
+      setLoading(true);
+      setError('');
+      const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/responses/reminder/${id}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to load reminder details');
+      }
+      const data = await res.json();
+      setPatientName(data.patient?.name || 'Patient');
+      setReminderMessage(data.message || '');
     } catch (error) {
       setError('Failed to load reminder details');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -100,7 +108,7 @@ const PatientPortal = () => {
             <Heart className="h-8 w-8 text-white" />
           </div>
           <h2 className="mt-6 text-2xl font-bold text-gray-900">
-            CareSync AI Follow-up
+            CareSync AI Follow-up {patientName ? `for ${patientName}` : ''}
           </h2>
           <p className="mt-2 text-sm text-gray-600">
             Please respond to your healthcare provider's follow-up

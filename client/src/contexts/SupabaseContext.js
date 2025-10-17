@@ -1,25 +1,39 @@
-import React, { createContext, useContext } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import React, { createContext, useContext } from "react";
+import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || 'https://phoumeccawrtsjztxldi.supabase.co';
-const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBob3VtZWNjYXdydHNqenR4bGRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAzNDEyNTcsImV4cCI6MjA3NTkxNzI1N30.xMGO_scepJgrqhF318DZuXQwuVcZR47AMS81wFwcQA0';
+const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
+const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
 
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// 🟢 Create the Supabase client once (singleton)
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error(
+    "🚨 Missing environment variables: REACT_APP_SUPABASE_URL or REACT_APP_SUPABASE_ANON_KEY"
+  );
+  console.warn(
+    "Make sure your .env file is in the project root and prefixed with REACT_APP_. Then restart your dev server."
+  );
+}
+
+console.log("🔍 Supabase URL:", supabaseUrl);
+console.log(
+  "🔍 Supabase Key:",
+  supabaseAnonKey ? supabaseAnonKey.slice(0, 12) + "..." : "undefined"
+);
+
+const supabase = createClient(supabaseUrl || "", supabaseAnonKey || "");
 
 const SupabaseContext = createContext();
 
 export const useSupabase = () => {
   const context = useContext(SupabaseContext);
   if (!context) {
-    throw new Error('useSupabase must be used within a SupabaseProvider');
+    throw new Error("useSupabase must be used within a SupabaseProvider");
   }
   return context;
 };
 
-export const SupabaseProvider = ({ children }) => {
-  return (
-    <SupabaseContext.Provider value={{ supabase }}>
-      {children}
-    </SupabaseContext.Provider>
-  );
-};
+export const SupabaseProvider = ({ children }) => (
+  <SupabaseContext.Provider value={{ supabase }}>
+    {children}
+  </SupabaseContext.Provider>
+);
