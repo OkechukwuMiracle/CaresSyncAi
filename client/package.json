@@ -3,31 +3,30 @@
   "version": "1.0.0",
   "private": true,
   "dependencies": {
+    "@supabase/supabase-js": "^2.38.4",
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^14.5.1",
+    "axios": "^1.6.2",
+    "date-fns": "^2.30.0",
+    "lucide-react": "^0.294.0",
+    "next": "14.2.5",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.8.1",
-    "react-scripts": "5.0.1",
-    "web-vitals": "^2.1.4",
-    "@supabase/supabase-js": "^2.38.4",
-    "axios": "^1.6.2",
-    "lucide-react": "^0.294.0",
     "react-hot-toast": "^2.4.1",
-    "date-fns": "^2.30.0",
     "recharts": "^2.8.0"
   },
   "devDependencies": {
-    "tailwindcss": "^3.3.6",
     "autoprefixer": "^10.4.16",
-    "postcss": "^8.4.32"
+    "postcss": "^8.4.32",
+    "tailwindcss": "^3.3.6",
+    "typescript": "5.9.3"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "test": "echo \"No test setup for Next.js yet\" && exit 0"
   },
   "eslintConfig": {
     "extends": [

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { 
   Home, 
   Users, 
@@ -16,7 +17,7 @@ import { useAuth } from '../../contexts/AuthContext';
 
 const Layout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const location = useLocation();
+  const pathname = usePathname();
   const { clinic, signOut } = useAuth();
 
   const navigation = [
@@ -29,7 +30,7 @@ const Layout = ({ children }) => {
   ];
 
   const isActive = (path) => {
-    return location.pathname === path;
+    return pathname === path;
   };
 
   const handleSignOut = async () => {
@@ -66,7 +67,7 @@ const Layout = ({ children }) => {
               return (
                 <Link
                   key={item.name}
-                  to={item.href}
+                  href={item.href}
                   className={`sidebar-link ${
                     isActive(item.href) ? 'sidebar-link-active' : 'sidebar-link-inactive'
                   }`}
@@ -78,6 +79,26 @@ const Layout = ({ children }) => {
               );
             })}
           </nav>
+          <div className="border-t border-gray-200 p-4">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className="h-8 w-8 bg-gray-300 rounded-full flex items-center justify-center">
+                  <User className="h-5 w-5 text-gray-600" />
+                </div>
+              </div>
+              <div className="ml-3 flex-1">
+                <p className="text-sm font-medium text-gray-900">{clinic?.name}</p>
+                <p className="text-xs text-gray-500 capitalize">{clinic?.subscription_plan}</p>
+              </div>
+              <button
+                onClick={handleSignOut}
+                className="ml-2 text-gray-400 hover:text-gray-600"
+                title="Sign out"
+              >
+                <LogOut className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -102,7 +123,7 @@ const Layout = ({ children }) => {
               return (
                 <Link
                   key={item.name}
-                  to={item.href}
+                  href={item.href}
                   className={`sidebar-link ${
                     isActive(item.href) ? 'sidebar-link-active' : 'sidebar-link-inactive'
                   }`}

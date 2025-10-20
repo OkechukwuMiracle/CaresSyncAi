@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Bell, Plus } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import Link from 'next/link';
 import { useSupabase } from '../../contexts/SupabaseContext';
 import LoadingSpinner from '../common/LoadingSpinner';
 
@@ -19,7 +19,7 @@ const Reminders = () => {
           setLoading(false);
           return;
         }
-        const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/reminders`, {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/reminders`, {
           headers: { Authorization: `Bearer ${session.access_token}` },
         });
         if (!res.ok) {
@@ -44,7 +44,7 @@ const Reminders = () => {
           <h1 className="text-2xl font-bold text-gray-900">Reminders</h1>
           <p className="text-gray-600">Schedule and manage patient follow-up reminders</p>
         </div>
-        <Link to="/reminders/new" className="btn-primary flex items-center">
+        <Link href="/reminders/new" className="btn-primary flex items-center">
           <Plus className="h-4 w-4 mr-2" />
           Schedule Reminder
         </Link>
@@ -60,7 +60,7 @@ const Reminders = () => {
             <Bell className="h-16 w-16 mx-auto text-gray-300 mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No reminders yet</h3>
             <p className="text-gray-600 mb-6">Create your first follow-up reminder.</p>
-            <Link to="/reminders/new" className="btn-primary">Schedule Your First Reminder</Link>
+            <Link href="/reminders/new" className="btn-primary">Schedule Your First Reminder</Link>
           </div>
         ) : (
           <div className="divide-y">

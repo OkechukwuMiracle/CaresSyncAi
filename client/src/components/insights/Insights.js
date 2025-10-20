@@ -17,7 +17,7 @@ const Insights = () => {
           setLoading(false);
           return;
         }
-        const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/insights/dashboard?period=7d`, {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/insights/dashboard?period=7d`, {
           headers: { Authorization: `Bearer ${session.access_token}` },
         });
         if (!res.ok) {

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import Link  from 'next/link';
 import { Eye, EyeOff, Mail, Lock, Building, Phone, MapPin, Heart } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import LoadingSpinner from '../common/LoadingSpinner';
@@ -252,7 +252,7 @@ const Register = () => {
 
             <div className="mt-6">
               <Link
-                to="/login"
+                href="/login"
                 className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200"
               >
                 Sign in instead

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import Link  from 'next/link';
 import { 
   Users, 
   Bell, 
@@ -26,11 +26,12 @@ const Dashboard = () => {
       
       if (!session?.access_token) {
         console.error('No session token available');
+        setLoading(false);
         return;
       }
   
       const response = await fetch(
-        `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/clinics/dashboard`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/clinics/dashboard`,
         {
           headers: {
             'Authorization': `Bearer ${session.access_token}`,
@@ -42,7 +43,8 @@ const Dashboard = () => {
         const data = await response.json();
         setDashboardData(data);
       } else {
-        console.error('Failed to fetch dashboard data');
+        const text = await response.text();
+        console.error('Failed to fetch dashboard data:', response.status, text);
       }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -103,21 +105,21 @@ const Dashboard = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="md:flex items-center justify-between">
+        <div className="mb-4 md:mb-0 ">
           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
           <p className="text-gray-600">Welcome back, {clinic?.name}</p>
         </div>
         <div className="flex space-x-3">
           <Link
-            to="/patients/new"
+            href="/patients"
             className="btn-primary flex items-center"
           >
             <Plus className="h-4 w-4 mr-2" />
             Add Patient
           </Link>
           <Link
-            to="/reminders/new"
+            href="/reminders"
             className="btn-secondary flex items-center"
           >
             <Bell className="h-4 w-4 mr-2" />
@@ -133,7 +135,7 @@ const Dashboard = () => {
           return (
             <Link
               key={stat.name}
-              to={stat.href}
+              href={stat.href}
               className="card hover:shadow-md transition-shadow duration-200"
             >
               <div className="flex items-center">
@@ -155,7 +157,7 @@ const Dashboard = () => {
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900">Today's AI Insights</h2>
           <Link
-            to="/insights"
+            href="/insights"
             className="text-primary-600 hover:text-primary-700 text-sm font-medium"
           >
             View All
@@ -192,7 +194,7 @@ const Dashboard = () => {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-900">Upcoming Follow-ups</h2>
             <Link
-              to="/patients"
+              href="/patients"
               className="text-primary-600 hover:text-primary-700 text-sm font-medium"
             >
               View All
@@ -230,7 +232,7 @@ const Dashboard = () => {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-900">Recent Responses</h2>
             <Link
-              to="/insights"
+              href="/insights"
               className="text-primary-600 hover:text-primary-700 text-sm font-medium"
             >
               View All
@@ -318,7 +320,7 @@ const Dashboard = () => {
               </p>
             </div>
             <Link
-              to="/subscription"
+              href="/subscription"
               className="btn-primary"
             >
               Upgrade Now

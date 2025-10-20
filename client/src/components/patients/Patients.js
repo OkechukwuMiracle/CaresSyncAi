@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Users, Plus } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import Link from 'next/link';
 import { useSupabase } from '../../contexts/SupabaseContext';
 import LoadingSpinner from '../common/LoadingSpinner';
 
@@ -19,7 +19,7 @@ const Patients = () => {
           setLoading(false);
           return;
         }
-        const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/patients`, {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/patients`, {
           headers: {
             Authorization: `Bearer ${session.access_token}`,
           },
@@ -46,7 +46,7 @@ const Patients = () => {
           <h1 className="text-2xl font-bold text-gray-900">Patients</h1>
           <p className="text-gray-600">Manage your patient records and follow-ups</p>
         </div>
-        <Link to="/patients/new" className="btn-primary flex items-center">
+        <Link href="/patients/new" className="btn-primary flex items-center">
           <Plus className="h-4 w-4 mr-2" />
           Add Patient
         </Link>
@@ -62,7 +62,7 @@ const Patients = () => {
             <Users className="h-16 w-16 mx-auto text-gray-300 mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No patients yet</h3>
             <p className="text-gray-600 mb-6">Add your first patient to get started.</p>
-            <Link to="/patients/new" className="btn-primary">Add Your First Patient</Link>
+            <Link href="/patients/new" className="btn-primary">Add Your First Patient</Link>
           </div>
         ) : (
           <div className="divide-y">
@@ -72,7 +72,7 @@ const Patients = () => {
                   <div className="font-medium text-gray-900">{p.name}</div>
                   <div className="text-sm text-gray-600">{p.email || 'No email'} · {p.phone || 'No phone'}</div>
                 </div>
-                <Link to={`/patients/${p.id}`} className="btn-secondary">View</Link>
+                <Link href={`/patients/${p.id}`} className="btn-secondary">View</Link>
               </div>
             ))}
           </div>

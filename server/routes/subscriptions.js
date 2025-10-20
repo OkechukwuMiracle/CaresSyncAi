@@ -27,19 +27,42 @@ router.get('/plans', async (req, res) => {
 // Get current clinic subscription
 router.get('/current', authenticateUser, async (req, res) => {
   try {
+    // Add logging to debug
+    console.log('User:', req.user?.email);
+    console.log('Clinic ID:', req.clinic?.id);
+    
+    if (!req.clinic?.id) {
+      return res.status(400).json({ error: 'Clinic ID not found in request' });
+    }
+
+    // First, get the clinic without the join to see if that works
     const { data: clinic, error } = await supabase
       .from('clinics')
-      .select(`
-        *,
-        subscription_plans (
-          *
-        )
-      `)
+      .select('*')
       .eq('id', req.clinic.id)
       .single();
 
     if (error) {
+      console.error('Clinic query error:', error);
       return res.status(400).json({ error: error.message });
+    }
+
+    if (!clinic) {
+      return res.status(404).json({ error: 'Clinic not found' });
+    }
+
+    // Get the subscription plan separately if it exists
+    let subscriptionPlan = null;
+    if (clinic.subscription_plan) {
+      const { data: plan, error: planError } = await supabase
+        .from('subscription_plans')
+        .select('*')
+        .eq('name', clinic.subscription_plan)
+        .single();
+      
+      if (!planError && plan) {
+        subscriptionPlan = plan;
+      }
     }
 
     // Get payment history
@@ -51,12 +74,16 @@ router.get('/current', authenticateUser, async (req, res) => {
       .limit(10);
 
     if (paymentsError) {
-      return res.status(400).json({ error: paymentsError.message });
+      console.error('Payments query error:', paymentsError);
+      // Don't fail the whole request if payments fail
     }
 
     res.json({
-      clinic,
-      payments
+      clinic: {
+        ...clinic,
+        subscription_plans: subscriptionPlan
+      },
+      payments: payments || []
     });
   } catch (error) {
     console.error('Get current subscription error:', error);
@@ -73,7 +100,6 @@ router.post('/initialize-payment', authenticateUser, async (req, res) => {
       return res.status(400).json({ error: 'Plan ID is required' });
     }
 
-    // Get plan details
     const { data: plan, error: planError } = await supabase
       .from('subscription_plans')
       .select('*')
@@ -84,30 +110,31 @@ router.post('/initialize-payment', authenticateUser, async (req, res) => {
       return res.status(404).json({ error: 'Plan not found' });
     }
 
-    // Calculate amount
-    const amount = billing_period === 'yearly' ? plan.price_yearly : plan.price_monthly;
-    const amountInKobo = Math.round(amount * 100); // Convert to kobo for Paystack
+    // Use USD pricing
+    const amountUSD = billing_period === 'yearly' ? plan.price_yearly : plan.price_monthly;
 
-    // Calculate billing period dates
+    // Convert to NGN for Paystack (temporary workaround)
+    const conversionRate = parseFloat(process.env.USD_TO_NGN || '1600');
+    const amountNGN = amountUSD * conversionRate;
+    const amountInKobo = Math.round(amountNGN * 100);
+
     const startDate = new Date();
     const endDate = new Date();
-    if (billing_period === 'yearly') {
-      endDate.setFullYear(startDate.getFullYear() + 1);
-    } else {
-      endDate.setMonth(startDate.getMonth() + 1);
-    }
+    billing_period === 'yearly'
+      ? endDate.setFullYear(startDate.getFullYear() + 1)
+      : endDate.setMonth(startDate.getMonth() + 1);
 
-    // Initialize Paystack payment
     const paymentData = {
       email: req.clinic.email,
       amount: amountInKobo,
-      currency: 'NGN',
+      currency: 'NGN', // Paystack only accepts NGN
       reference: `caresync_${req.clinic.id}_${Date.now()}`,
       metadata: {
         clinic_id: req.clinic.id,
-        plan_id: plan_id,
-        billing_period: billing_period,
-        plan_name: plan.name
+        plan_id,
+        billing_period,
+        plan_name: plan.name,
+        amount_usd: amountUSD
       },
       callback_url: `${process.env.CLIENT_URL}/subscription/callback`,
       channels: ['card', 'bank', 'ussd', 'qr', 'mobile_money', 'bank_transfer']
@@ -119,14 +146,14 @@ router.post('/initialize-payment', authenticateUser, async (req, res) => {
       return res.status(400).json({ error: 'Failed to initialize payment' });
     }
 
-    // Create payment record
+    // Save in USD
     const { data: payment, error: paymentError } = await supabase
       .from('payments')
       .insert({
         clinic_id: req.clinic.id,
-        plan_id: plan_id,
-        amount: amount,
-        currency: 'NGN',
+        plan_id,
+        amount: amountUSD,
+        currency: 'USD',
         payment_method: 'paystack',
         external_payment_id: response.data.reference,
         status: 'pending',
@@ -151,6 +178,7 @@ router.post('/initialize-payment', authenticateUser, async (req, res) => {
     res.status(500).json({ error: 'Failed to initialize payment' });
   }
 });
+
 
 // Verify payment and update subscription
 router.post('/verify-payment', authenticateUser, async (req, res) => {

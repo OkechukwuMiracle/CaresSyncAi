@@ -25,7 +25,7 @@ const PatientPortal = () => {
     try {
       setLoading(true);
       setError('');
-      const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/responses/reminder/${id}`);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/responses/reminder/${id}`);
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || 'Failed to load reminder details');
@@ -52,7 +52,7 @@ const PatientPortal = () => {
     setError('');
 
     try {
-      const response_data = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/responses/submit`, {
+      const response_data = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/responses/submit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
