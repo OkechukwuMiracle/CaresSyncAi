@@ -1,4 +1,4 @@
-import Login from "../app/login/page"
+import Login from "../src/components/auth/Login"
 
 export default function HomePage() {
   return (
