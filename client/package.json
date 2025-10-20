@@ -4,9 +4,6 @@
   "private": true,
   "dependencies": {
     "@supabase/supabase-js": "^2.38.4",
-    "@testing-library/jest-dom": "^5.17.0",
-    "@testing-library/react": "^13.4.0",
-    "@testing-library/user-event": "^14.5.1",
     "axios": "^1.6.2",
     "date-fns": "^2.30.0",
     "lucide-react": "^0.294.0",
@@ -17,6 +14,7 @@
     "recharts": "^2.8.0"
   },
   "devDependencies": {
+    "@types/react": "19.2.2",
     "autoprefixer": "^10.4.16",
     "postcss": "^8.4.32",
     "tailwindcss": "^3.3.6",
@@ -26,13 +24,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "echo \"No test setup for Next.js yet\" && exit 0"
-  },
-  "eslintConfig": {
-    "extends": [
-      "react-app",
-      "react-app/jest"
-    ]
+    "lint": "next lint"
   },
   "browserslist": {
     "production": [

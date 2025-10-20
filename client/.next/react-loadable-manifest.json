@@ -14,5 +14,9 @@
   "node_modules\\@supabase\\storage-js\\dist\\module\\lib\\helpers.js -> @supabase/node-fetch": {
     "id": "node_modules\\@supabase\\storage-js\\dist\\module\\lib\\helpers.js -> @supabase/node-fetch",
     "files": []
+  },
+  "node_modules\\@supabase\\storage-js\\dist\\module\\lib\\vectors\\helpers.js -> @supabase/node-fetch": {
+    "id": "node_modules\\@supabase\\storage-js\\dist\\module\\lib\\vectors\\helpers.js -> @supabase/node-fetch",
+    "files": []
   }
 }
