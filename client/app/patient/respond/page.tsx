@@ -1,6 +1,11 @@
 "use client";
-import PatientPortal from '../../../src/components/patientPortal/PatientPortal';
+import { Suspense } from "react";
+import PatientPortal from "../../../src/components/patientPortal/PatientPortal";
 
 export default function PatientRespondPage() {
-  return <PatientPortal />;
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <PatientPortal />
+    </Suspense>
+  );
 }

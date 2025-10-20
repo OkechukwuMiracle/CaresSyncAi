@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'next/navigation';
 import { Heart, Send, CheckCircle } from 'lucide-react';
 import LoadingSpinner from '../common/LoadingSpinner';
 
