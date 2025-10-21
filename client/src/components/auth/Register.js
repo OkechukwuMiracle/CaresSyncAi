@@ -1,3 +1,5 @@
+"use client"
+
 import React, { useState } from 'react';
 import Link  from 'next/link';
 import { Eye, EyeOff, Mail, Lock, Building, Phone, MapPin, Heart } from 'lucide-react';

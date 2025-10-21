@@ -1,3 +1,5 @@
+"use client"
+
 import React, { useEffect, useState } from 'react';
 import { CreditCard, Check, X, Star, Loader2 } from 'lucide-react';
 import { useSupabase } from '../../contexts/SupabaseContext';

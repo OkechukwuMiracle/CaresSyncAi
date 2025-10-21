@@ -1,3 +1,5 @@
+"use client"
+
 import React, { useEffect, useState } from 'react';
 import { BarChart3 } from 'lucide-react';
 import { useSupabase } from '../../contexts/SupabaseContext';

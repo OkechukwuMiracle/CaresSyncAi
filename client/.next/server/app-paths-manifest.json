@@ -2,16 +2,16 @@
   "/_not-found/page": "app/_not-found/page.js",
   "/page": "app/page.js",
   "/patient/respond/page": "app/patient/respond/page.js",
-  "/register/page": "app/register/page.js",
   "/login/page": "app/login/page.js",
-  "/(protected)/insights/page": "app/(protected)/insights/page.js",
+  "/register/page": "app/register/page.js",
+  "/(protected)/dashboard/page": "app/(protected)/dashboard/page.js",
+  "/(protected)/patients/[id]/page": "app/(protected)/patients/[id]/page.js",
+  "/(protected)/patients/page": "app/(protected)/patients/page.js",
   "/(protected)/reminders/page": "app/(protected)/reminders/page.js",
   "/(protected)/settings/page": "app/(protected)/settings/page.js",
-  "/(protected)/patients/new/page": "app/(protected)/patients/new/page.js",
   "/(protected)/subscription/page": "app/(protected)/subscription/page.js",
-  "/(protected)/subscription/callback/page": "app/(protected)/subscription/callback/page.js",
   "/(protected)/reminders/new/page": "app/(protected)/reminders/new/page.js",
-  "/(protected)/patients/page": "app/(protected)/patients/page.js",
-  "/(protected)/patients/[id]/page": "app/(protected)/patients/[id]/page.js",
-  "/(protected)/dashboard/page": "app/(protected)/dashboard/page.js"
+  "/(protected)/subscription/callback/page": "app/(protected)/subscription/callback/page.js",
+  "/(protected)/insights/page": "app/(protected)/insights/page.js",
+  "/(protected)/patients/new/page": "app/(protected)/patients/new/page.js"
 }
