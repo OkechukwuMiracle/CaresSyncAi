@@ -8,13 +8,12 @@ import LoadingSpinner from "../common/LoadingSpinner";
 import { useRouter } from "next/navigation";
 
 const Login = () => {
-  
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
+  const [errors, setErrors] = useState({});
   const { signIn } = useAuth();
-  const router = useRouter(); // ✅ Initialize router
+  const router = useRouter();
   const isMounted = useRef(true);
 
   useEffect(() => {
@@ -23,29 +22,64 @@ const Login = () => {
     };
   }, []);
 
+  const validateForm = () => {
+    const newErrors = {};
+
+    // Email validation
+    if (!formData.email) {
+      newErrors.email = "Email is required";
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = "Please enter a valid email address";
+    }
+
+    // Password validation
+    if (!formData.password) {
+      newErrors.password = "Password is required";
+    } else if (formData.password.length < 6) {
+      newErrors.password = "Password must be at least 6 characters";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleChange = (e) => {
-      setFormData({
-        ...formData,
-        [e.target.name]: e.target.value,
+    const { name, value } = e.target;
+    setFormData({
+      ...formData,
+      [name]: value,
+    });
+    // Clear error for this field when user starts typing
+    if (errors[name]) {
+      setErrors({
+        ...errors,
+        [name]: "",
       });
-    };
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validate form before submission
+    if (!validateForm()) {
+      return;
+    }
+
     setIsLoading(true);
-    setErrorMsg("");
+    setErrors({});
 
     try {
       const result = await signIn(formData.email, formData.password);
       if (!result.success) {
-        setErrorMsg(result.error || "Login failed. Please try again.");
+        setErrors({ general: result.error || "Login failed. Please try again." });
       } else {
-        // ✅ Redirect to dashboard immediately after login
+        // Redirect is handled by AuthContext's onAuthStateChange
         router.push("/dashboard");
       }
     } catch (error) {
       console.error("Login error:", error);
-      setErrorMsg(error.message || "An unexpected error occurred.");
+      setErrors({ general: error.message || "An unexpected error occurred." });
     } finally {
       if (isMounted.current) setIsLoading(false);
     }
@@ -69,7 +103,14 @@ const Login = () => {
 
         {/* Login Form */}
         <div className="bg-white rounded-2xl shadow-xl p-8">
-          <form className="space-y-6" onSubmit={handleSubmit}>
+          <form className="space-y-6" onSubmit={handleSubmit} noValidate>
+            {/* General Error Message */}
+            {errors.general && (
+              <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+                {errors.general}
+              </div>
+            )}
+
             <div>
               <label htmlFor="email" className="label">
                 Email Address
@@ -83,14 +124,16 @@ const Login = () => {
                   name="email"
                   type="email"
                   autoComplete="email"
-                  required
-                  className="input-field pl-10"
+                  className={`input-field pl-10 ${errors.email ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}`}
                   disabled={isLoading}
                   placeholder="Enter your email"
                   value={formData.email}
                   onChange={handleChange}
                 />
               </div>
+              {errors.email && (
+                <p className="mt-1 text-sm text-red-600">{errors.email}</p>
+              )}
             </div>
 
             <div>
@@ -106,8 +149,7 @@ const Login = () => {
                   name="password"
                   type={showPassword ? "text" : "password"}
                   autoComplete="current-password"
-                  required
-                  className="input-field pl-10 pr-10"
+                  className={`input-field pl-10 pr-10 ${errors.password ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}`}
                   disabled={isLoading}
                   placeholder="Enter your password"
                   value={formData.password}
@@ -129,19 +171,16 @@ const Login = () => {
                   )}
                 </button>
               </div>
+              {errors.password && (
+                <p className="mt-1 text-sm text-red-600">{errors.password}</p>
+              )}
             </div>
-
-            {errorMsg && (
-              <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2 mb-2">
-                {errorMsg}
-              </div>
-            )}
 
             <div>
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full btn-primary flex items-center justify-center"
+                className="w-full btn-primary flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? <LoadingSpinner size="sm" /> : "Sign In"}
               </button>

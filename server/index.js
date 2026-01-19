@@ -58,6 +58,7 @@ app.use('*', (req, res) => {
 app.listen(PORT, () => {
   console.log(`🚀 CareSync AI Server running on port ${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log('📅 Reminder scheduler initialized');
 });
 
 module.exports = app;

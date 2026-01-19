@@ -1,12 +1,13 @@
 "use client"
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Heart, Send, CheckCircle } from 'lucide-react';
 import LoadingSpinner from '../common/LoadingSpinner';
 
-const PatientPortal = () => {
-  const [searchParams] = useSearchParams();
+// Inner component that uses useSearchParams
+const PatientPortalContent = () => {
+  const searchParams = useSearchParams();
   const [reminderId, setReminderId] = useState(null);
   const [patientName, setPatientName] = useState('');
   const [reminderMessage, setReminderMessage] = useState('');
@@ -17,9 +18,12 @@ const PatientPortal = () => {
 
   useEffect(() => {
     const id = searchParams.get('reminder_id');
+    console.log('Reminder ID from URL:', id); // Debug log
     if (id) {
       setReminderId(id);
       fetchReminderDetails(id);
+    } else {
+      setError('No reminder ID found in URL. Please use the link provided in your reminder.');
     }
   }, [searchParams]);
 
@@ -50,28 +54,40 @@ const PatientPortal = () => {
       return;
     }
 
+    if (!reminderId) {
+      setError('Missing reminder ID. Please use the link provided in your reminder.');
+      return;
+    }
+
     setLoading(true);
     setError('');
 
     try {
-      const response_data = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/responses/submit`, {
+      const payload = {
+        reminder_id: reminderId,
+        response_text: response,
+      };
+      
+      console.log('Submitting payload:', payload); // Debug log
+      
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/responses/submit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          reminder_id: reminderId,
-          response_text: response,
-        }),
+        body: JSON.stringify(payload),
       });
 
-      if (response_data.ok) {
+      const data = await res.json();
+      console.log('Response:', data); // Debug log
+
+      if (res.ok) {
         setSubmitted(true);
       } else {
-        const errorData = await response_data.json();
-        setError(errorData.error || 'Failed to submit response');
+        setError(data.error || 'Failed to submit response');
       }
     } catch (error) {
+      console.error('Submit error:', error); // Debug log
       setError('Failed to submit response. Please try again.');
     } finally {
       setLoading(false);
@@ -155,7 +171,7 @@ const PatientPortal = () => {
             <div>
               <button
                 type="submit"
-                disabled={loading || !response.trim()}
+                disabled={loading || !response.trim() || !reminderId}
                 className="w-full btn-primary flex items-center justify-center"
               >
                 {loading ? (
@@ -187,6 +203,15 @@ const PatientPortal = () => {
         </div>
       </div>
     </div>
+  );
+};
+
+// Outer component wrapped in Suspense
+const PatientPortal = () => {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <PatientPortalContent />
+    </Suspense>
   );
 };
 

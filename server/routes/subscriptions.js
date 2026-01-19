@@ -4,8 +4,8 @@ const { authenticateUser } = require('../middleware/auth');
 const Paystack = require('paystack')(process.env.PAYSTACK_SECRET_KEY);
 const router = express.Router();
 
-// Get all subscription plans
-router.get('/plans', async (req, res) => {
+// Get all subscription plans - NOW REQUIRES AUTHENTICATION
+router.get('/plans', authenticateUser, async (req, res) => {
   try {
     const { data: plans, error } = await supabase
       .from('subscription_plans')
@@ -27,7 +27,6 @@ router.get('/plans', async (req, res) => {
 // Get current clinic subscription
 router.get('/current', authenticateUser, async (req, res) => {
   try {
-    // Add logging to debug
     console.log('User:', req.user?.email);
     console.log('Clinic ID:', req.clinic?.id);
     
@@ -35,21 +34,32 @@ router.get('/current', authenticateUser, async (req, res) => {
       return res.status(400).json({ error: 'Clinic ID not found in request' });
     }
 
-    // First, get the clinic without the join to see if that works
-    const { data: clinic, error } = await supabase
-      .from('clinics')
-      .select('*')
-      .eq('id', req.clinic.id)
-      .single();
+    // ✅ Run queries in parallel for better performance
+    const [clinicResult, paymentsResult] = await Promise.all([
+      supabase
+        .from('clinics')
+        .select('*')
+        .eq('id', req.clinic.id)
+        .single(),
+      
+      supabase
+        .from('payments')
+        .select('*')
+        .eq('clinic_id', req.clinic.id)
+        .order('created_at', { ascending: false })
+        .limit(10)
+    ]);
 
-    if (error) {
-      console.error('Clinic query error:', error);
-      return res.status(400).json({ error: error.message });
+    if (clinicResult.error) {
+      console.error('Clinic query error:', clinicResult.error);
+      return res.status(400).json({ error: clinicResult.error.message });
     }
 
-    if (!clinic) {
+    if (!clinicResult.data) {
       return res.status(404).json({ error: 'Clinic not found' });
     }
+
+    const clinic = clinicResult.data;
 
     // Get the subscription plan separately if it exists
     let subscriptionPlan = null;
@@ -65,16 +75,8 @@ router.get('/current', authenticateUser, async (req, res) => {
       }
     }
 
-    // Get payment history
-    const { data: payments, error: paymentsError } = await supabase
-      .from('payments')
-      .select('*')
-      .eq('clinic_id', req.clinic.id)
-      .order('created_at', { ascending: false })
-      .limit(10);
-
-    if (paymentsError) {
-      console.error('Payments query error:', paymentsError);
+    if (paymentsResult.error) {
+      console.error('Payments query error:', paymentsResult.error);
       // Don't fail the whole request if payments fail
     }
 
@@ -83,7 +85,7 @@ router.get('/current', authenticateUser, async (req, res) => {
         ...clinic,
         subscription_plans: subscriptionPlan
       },
-      payments: payments || []
+      payments: paymentsResult.data || []
     });
   } catch (error) {
     console.error('Get current subscription error:', error);
@@ -178,7 +180,6 @@ router.post('/initialize-payment', authenticateUser, async (req, res) => {
     res.status(500).json({ error: 'Failed to initialize payment' });
   }
 });
-
 
 // Verify payment and update subscription
 router.post('/verify-payment', authenticateUser, async (req, res) => {
@@ -311,7 +312,7 @@ router.get('/payments', authenticateUser, async (req, res) => {
           name,
           display_name
         )
-      `)
+      `, { count: 'exact' })
       .eq('clinic_id', req.clinic.id)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
@@ -348,27 +349,30 @@ router.get('/usage', authenticateUser, async (req, res) => {
       return res.status(400).json({ error: planError.message });
     }
 
-    // Get current usage
-    const { count: patientCount, error: patientError } = await supabase
-      .from('patients')
-      .select('*', { count: 'exact', head: true })
-      .eq('clinic_id', req.clinic.id)
-      .eq('is_active', true);
-
-    if (patientError) {
-      return res.status(400).json({ error: patientError.message });
-    }
-
     // Get monthly reminder count
     const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    const { count: reminderCount, error: reminderError } = await supabase
-      .from('reminders')
-      .select('*', { count: 'exact', head: true })
-      .eq('clinic_id', req.clinic.id)
-      .gte('created_at', startOfMonth.toISOString());
 
-    if (reminderError) {
-      return res.status(400).json({ error: reminderError.message });
+    // ✅ Run queries in parallel
+    const [patientCountResult, reminderCountResult] = await Promise.all([
+      supabase
+        .from('patients')
+        .select('*', { count: 'exact', head: true })
+        .eq('clinic_id', req.clinic.id)
+        .eq('is_active', true),
+      
+      supabase
+        .from('reminders')
+        .select('*', { count: 'exact', head: true })
+        .eq('clinic_id', req.clinic.id)
+        .gte('created_at', startOfMonth.toISOString())
+    ]);
+
+    if (patientCountResult.error) {
+      return res.status(400).json({ error: patientCountResult.error.message });
+    }
+
+    if (reminderCountResult.error) {
+      return res.status(400).json({ error: reminderCountResult.error.message });
     }
 
     const usage = {
@@ -379,12 +383,12 @@ router.get('/usage', authenticateUser, async (req, res) => {
         max_reminders_per_month: plan.max_reminders_per_month
       },
       current: {
-        patients: patientCount,
-        reminders_this_month: reminderCount
+        patients: patientCountResult.count || 0,
+        reminders_this_month: reminderCountResult.count || 0
       },
       limits: {
-        patients_remaining: plan.max_patients === -1 ? -1 : Math.max(0, plan.max_patients - patientCount),
-        reminders_remaining: plan.max_reminders_per_month === -1 ? -1 : Math.max(0, plan.max_reminders_per_month - reminderCount)
+        patients_remaining: plan.max_patients === -1 ? -1 : Math.max(0, plan.max_patients - (patientCountResult.count || 0)),
+        reminders_remaining: plan.max_reminders_per_month === -1 ? -1 : Math.max(0, plan.max_reminders_per_month - (reminderCountResult.count || 0))
       }
     };
 

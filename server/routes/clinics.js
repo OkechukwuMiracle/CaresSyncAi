@@ -3,115 +3,129 @@ const supabase = require('../config/database');
 const { authenticateUser } = require('../middleware/auth');
 const router = express.Router();
 
-// Get clinic dashboard overview
+// Get clinic dashboard overview - OPTIMIZED VERSION
 router.get('/dashboard', authenticateUser, async (req, res) => {
   try {
     const clinicId = req.clinic.id;
 
-    // Get patient count
-    const { count: patientCount, error: patientError } = await supabase
-      .from('patients')
-      .select('*', { count: 'exact', head: true })
-      .eq('clinic_id', clinicId)
-      .eq('is_active', true);
-
-    if (patientError) {
-      return res.status(400).json({ error: patientError.message });
-    }
-
-    // Get upcoming follow-ups (next 7 days)
+    // Calculate dates once
+    const today = new Date().toISOString().split('T')[0];
     const nextWeek = new Date();
     nextWeek.setDate(nextWeek.getDate() + 7);
     const nextWeekStr = nextWeek.toISOString().split('T')[0];
 
-    const { data: upcomingFollowUps, error: followUpError } = await supabase
-      .from('patients')
-      .select('*')
-      .eq('clinic_id', clinicId)
-      .eq('is_active', true)
-      .not('next_follow_up_date', 'is', null)
-      .lte('next_follow_up_date', nextWeekStr)
-      .order('next_follow_up_date', { ascending: true });
+    // ✅ CRITICAL FIX: Run ALL queries in parallel using Promise.all
+    const [
+      patientCountResult,
+      upcomingFollowUpsResult,
+      pendingRemindersResult,
+      recentResponsesResult,
+      urgentCasesResult,
+      todayInsightResult
+    ] = await Promise.all([
+      // Get patient count
+      supabase
+        .from('patients')
+        .select('*', { count: 'exact', head: true })
+        .eq('clinic_id', clinicId)
+        .eq('is_active', true),
 
-    if (followUpError) {
-      return res.status(400).json({ error: followUpError.message });
+      // Get upcoming follow-ups (next 7 days)
+      supabase
+        .from('patients')
+        .select('*')
+        .eq('clinic_id', clinicId)
+        .eq('is_active', true)
+        .not('next_follow_up_date', 'is', null)
+        .lte('next_follow_up_date', nextWeekStr)
+        .order('next_follow_up_date', { ascending: true }),
+
+      // Get pending reminders
+      supabase
+        .from('reminders')
+        .select('*', { count: 'exact', head: true })
+        .eq('clinic_id', clinicId)
+        .eq('status', 'pending'),
+
+      // Get recent responses
+      supabase
+        .from('patient_responses')
+        .select(`
+          *,
+          patients (
+            id,
+            name
+          )
+        `)
+        .eq('clinic_id', clinicId)
+        .order('created_at', { ascending: false })
+        .limit(5),
+
+      // Get urgent cases
+      supabase
+        .from('patient_responses')
+        .select(`
+          *,
+          patients (
+            id,
+            name,
+            phone,
+            email
+          )
+        `)
+        .eq('clinic_id', clinicId)
+        .eq('ai_status', 'Urgent')
+        .order('created_at', { ascending: false })
+        .limit(5),
+
+      // Get today's insights
+      supabase
+        .from('ai_insights')
+        .select('*')
+        .eq('clinic_id', clinicId)
+        .eq('date', today)
+        .single()
+    ]);
+
+    // Check for errors
+    if (patientCountResult.error) {
+      console.error('Patient count error:', patientCountResult.error);
+      return res.status(400).json({ error: patientCountResult.error.message });
     }
-
-    // Get pending reminders
-    const { count: pendingReminders, error: reminderError } = await supabase
-      .from('reminders')
-      .select('*', { count: 'exact', head: true })
-      .eq('clinic_id', clinicId)
-      .eq('status', 'pending');
-
-    if (reminderError) {
-      return res.status(400).json({ error: reminderError.message });
+    if (upcomingFollowUpsResult.error) {
+      console.error('Follow-ups error:', upcomingFollowUpsResult.error);
+      return res.status(400).json({ error: upcomingFollowUpsResult.error.message });
     }
-
-    // Get recent responses
-    const { data: recentResponses, error: responseError } = await supabase
-      .from('patient_responses')
-      .select(`
-        *,
-        patients (
-          id,
-          name
-        )
-      `)
-      .eq('clinic_id', clinicId)
-      .order('created_at', { ascending: false })
-      .limit(5);
-
-    if (responseError) {
-      return res.status(400).json({ error: responseError.message });
+    if (pendingRemindersResult.error) {
+      console.error('Reminders error:', pendingRemindersResult.error);
+      return res.status(400).json({ error: pendingRemindersResult.error.message });
     }
-
-    // Get urgent cases
-    const { data: urgentCases, error: urgentError } = await supabase
-      .from('patient_responses')
-      .select(`
-        *,
-        patients (
-          id,
-          name,
-          phone,
-          email
-        )
-      `)
-      .eq('clinic_id', clinicId)
-      .eq('ai_status', 'Urgent')
-      .order('created_at', { ascending: false })
-      .limit(5);
-
-    if (urgentError) {
-      return res.status(400).json({ error: urgentError.message });
+    if (recentResponsesResult.error) {
+      console.error('Responses error:', recentResponsesResult.error);
+      return res.status(400).json({ error: recentResponsesResult.error.message });
     }
-
-    // Get today's insights
-    const today = new Date().toISOString().split('T')[0];
-    const { data: todayInsight, error: insightError } = await supabase
-      .from('ai_insights')
-      .select('*')
-      .eq('clinic_id', clinicId)
-      .eq('date', today)
-      .single();
+    if (urgentCasesResult.error) {
+      console.error('Urgent cases error:', urgentCasesResult.error);
+      return res.status(400).json({ error: urgentCasesResult.error.message });
+    }
+    // Note: todayInsightResult.error is acceptable (PGRST116 = no rows)
 
     const dashboard = {
       overview: {
-        totalPatients: patientCount,
-        upcomingFollowUps: upcomingFollowUps.length,
-        pendingReminders,
-        urgentCases: urgentCases.length
+        totalPatients: patientCountResult.count || 0,
+        upcomingFollowUps: upcomingFollowUpsResult.data?.length || 0,
+        pendingReminders: pendingRemindersResult.count || 0,
+        urgentCases: urgentCasesResult.data?.length || 0
       },
-      todayInsights: todayInsight || {
+      todayInsights: todayInsightResult.data || {
         total_responses: 0,
         fine_count: 0,
         mild_issue_count: 0,
         urgent_count: 0
       },
-      upcomingFollowUps,
-      recentResponses,
-      urgentCases
+      upcomingFollowUps: upcomingFollowUpsResult.data || [],
+      recentResponses: recentResponsesResult.data || [],
+      urgentCases: urgentCasesResult.data || []
     };
 
     res.json(dashboard);
@@ -121,7 +135,7 @@ router.get('/dashboard', authenticateUser, async (req, res) => {
   }
 });
 
-// Get clinic statistics
+// Get clinic statistics - OPTIMIZED VERSION
 router.get('/stats', authenticateUser, async (req, res) => {
   try {
     const clinicId = req.clinic.id;
@@ -145,39 +159,41 @@ router.get('/stats', authenticateUser, async (req, res) => {
         startDate.setDate(endDate.getDate() - 30);
     }
 
-    // Get patient statistics
-    const { data: patients, error: patientError } = await supabase
-      .from('patients')
-      .select('created_at, is_active')
-      .eq('clinic_id', clinicId);
+    // ✅ Run all queries in parallel
+    const [patientsResult, remindersResult, responsesResult] = await Promise.all([
+      supabase
+        .from('patients')
+        .select('created_at, is_active')
+        .eq('clinic_id', clinicId),
 
-    if (patientError) {
-      return res.status(400).json({ error: patientError.message });
+      supabase
+        .from('reminders')
+        .select('status, contact_method, created_at')
+        .eq('clinic_id', clinicId)
+        .gte('created_at', startDate.toISOString())
+        .lte('created_at', endDate.toISOString()),
+
+      supabase
+        .from('patient_responses')
+        .select('ai_status, created_at')
+        .eq('clinic_id', clinicId)
+        .gte('created_at', startDate.toISOString())
+        .lte('created_at', endDate.toISOString())
+    ]);
+
+    if (patientsResult.error) {
+      return res.status(400).json({ error: patientsResult.error.message });
+    }
+    if (remindersResult.error) {
+      return res.status(400).json({ error: remindersResult.error.message });
+    }
+    if (responsesResult.error) {
+      return res.status(400).json({ error: responsesResult.error.message });
     }
 
-    // Get reminder statistics
-    const { data: reminders, error: reminderError } = await supabase
-      .from('reminders')
-      .select('status, contact_method, created_at')
-      .eq('clinic_id', clinicId)
-      .gte('created_at', startDate.toISOString())
-      .lte('created_at', endDate.toISOString());
-
-    if (reminderError) {
-      return res.status(400).json({ error: reminderError.message });
-    }
-
-    // Get response statistics
-    const { data: responses, error: responseError } = await supabase
-      .from('patient_responses')
-      .select('ai_status, created_at')
-      .eq('clinic_id', clinicId)
-      .gte('created_at', startDate.toISOString())
-      .lte('created_at', endDate.toISOString());
-
-    if (responseError) {
-      return res.status(400).json({ error: responseError.message });
-    }
+    const patients = patientsResult.data || [];
+    const reminders = remindersResult.data || [];
+    const responses = responsesResult.data || [];
 
     const stats = {
       period,

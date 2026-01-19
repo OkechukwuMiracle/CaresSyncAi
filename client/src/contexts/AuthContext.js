@@ -30,7 +30,6 @@ export const AuthProvider = ({ children }) => {
 
   const devLog = (...args) => {
     if (process.env.NODE_ENV === "development") {
-      // eslint-disable-next-line no-console
       console.log(...args);
     }
   };
@@ -71,7 +70,7 @@ export const AuthProvider = ({ children }) => {
         const err = await response.text();
         console.error("❌ Failed to fetch clinic data:", err);
         if (!aliveRef.current) return;
-        setClinic(null); // Clear stale data on failure
+        setClinic(null);
       }
     } catch (error) {
       console.error("🔥 Error fetching clinic data:", error);
@@ -80,7 +79,7 @@ export const AuthProvider = ({ children }) => {
     }
   }, [supabase]);
 
-  // Initialize session and subscribe to auth changes (StrictMode-safe)
+  // Initialize session and subscribe to auth changes
   useEffect(() => {
     aliveRef.current = true;
     setLoading(true);
@@ -104,21 +103,19 @@ export const AuthProvider = ({ children }) => {
         }
       } catch (e) {
         console.error("🔥 Error during session init:", e);
-      } finally {
-        // Defer resolving loading to onAuthStateChange (handles INITIAL_SESSION)
       }
     };
 
     init();
 
-    // Fallback: ensure loading resolves even if no auth event arrives promptly (dev/StrictMode)
+    // Fallback: ensure loading resolves even if no auth event arrives promptly
     const safetyTimer = setTimeout(() => {
       if (aliveRef.current) setLoading(false);
     }, 1500);
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       devLog("🔄 Auth state changed:", event);
       if (!aliveRef.current) return;
 
@@ -131,7 +128,8 @@ export const AuthProvider = ({ children }) => {
         case "TOKEN_REFRESHED":
         case "USER_UPDATED":
           if (currentUser) {
-            await fetchClinicData();
+            // Fetch clinic data OUTSIDE the callback to avoid deadlock
+            fetchClinicData();
           }
           break;
         case "SIGNED_OUT":
@@ -168,45 +166,63 @@ export const AuthProvider = ({ children }) => {
 
       const data = await response.json();
       if (response.ok) {
-        toast.success("Registration successful! Please verify your email.");
+        toast.success("Registration successful! Redirecting to login...");
         return { success: true, data };
       } else {
-        toast.error(data.error || "Registration failed");
-        return { success: false, error: data.error };
+        const errorMessage = data.error || "Registration failed";
+        toast.error(errorMessage);
+        return { success: false, error: errorMessage };
       }
     } catch (error) {
       console.error("❌ Sign-up error:", error);
-      toast.error("Registration failed. Please try again.");
-      return { success: false, error: error.message };
+      const errorMessage = "Registration failed. Please check your connection and try again.";
+      toast.error(errorMessage);
+      return { success: false, error: errorMessage };
     }
   };
 
   const signIn = async (email, password) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (error) {
-      toast.error(error.message);
-      return { success: false, error: error.message };
+      if (error) {
+        const errorMessage = error.message === "Invalid login credentials" 
+          ? "Invalid email or password" 
+          : error.message;
+        toast.error(errorMessage);
+        return { success: false, error: errorMessage };
+      }
+
+      toast.success("Login successful! Redirecting...");
+      // The onAuthStateChange listener will handle user and clinic data fetching
+      return { success: true };
+    } catch (error) {
+      console.error("❌ Sign-in error:", error);
+      const errorMessage = "Login failed. Please try again.";
+      toast.error(errorMessage);
+      return { success: false, error: errorMessage };
     }
-
-    toast.success("Login successful!");
-    // The onAuthStateChange listener will handle user and clinic data fetching
-    return { success: true };
   };
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      toast.error("Logout failed");
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        toast.error("Logout failed");
+        console.error("❌ Sign-out error:", error);
+        return { success: false };
+      }
+      toast.success("Logged out successfully");
+      // The onAuthStateChange listener will handle state cleanup
+      return { success: true };
+    } catch (error) {
       console.error("❌ Sign-out error:", error);
+      toast.error("Logout failed");
       return { success: false };
     }
-    toast.success("Logged out successfully");
-    // The onAuthStateChange listener will handle state cleanup
-    return { success: true };
   };
 
   const value = {

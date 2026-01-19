@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useCallback } from 'react';
-import Link  from 'next/link';
+import Link from 'next/link';
 import { 
   Users, 
   Bell, 
@@ -17,13 +17,20 @@ import LoadingSpinner from '../common/LoadingSpinner';
 import { useSupabase } from '../../contexts/SupabaseContext';
 
 const Dashboard = () => {
-  const { clinic } = useAuth();
+  const { clinic, loading: authLoading } = useAuth();
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const { supabase } = useSupabase();
 
   const fetchDashboardData = useCallback(async () => {
+    // Don't fetch if auth is still loading
+    if (authLoading) return;
+
     try {
+      setLoading(true);
+      setError('');
+
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session?.access_token) {
@@ -47,22 +54,43 @@ const Dashboard = () => {
       } else {
         const text = await response.text();
         console.error('Failed to fetch dashboard data:', response.status, text);
+        setError('Failed to load dashboard data');
       }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
+      setError('An error occurred while loading the dashboard');
     } finally {
       setLoading(false);
     }
-  }, [supabase]);
+  }, [supabase, authLoading]);
 
   useEffect(() => {
-    fetchDashboardData();
-  }, [fetchDashboardData]);
+    // Only fetch when auth is ready
+    if (!authLoading) {
+      fetchDashboardData();
+    }
+  }, [authLoading, fetchDashboardData]);
 
-  if (loading) {
+  // Show loading while auth is initializing OR dashboard is loading
+  if (authLoading || loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
+
+  // Show error if any
+  if (error) {
+    return (
+      <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+        <p className="text-sm text-red-700">{error}</p>
+        <button 
+          onClick={fetchDashboardData}
+          className="mt-2 text-sm text-red-600 hover:text-red-800 underline"
+        >
+          Retry
+        </button>
       </div>
     );
   }
@@ -108,7 +136,7 @@ const Dashboard = () => {
     <div className="space-y-6">
       {/* Header */}
       <div className="md:flex items-center justify-between">
-        <div className="mb-4 md:mb-0 ">
+        <div className="mb-4 md:mb-0">
           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
           <p className="text-gray-600">Welcome back, {clinic?.name}</p>
         </div>

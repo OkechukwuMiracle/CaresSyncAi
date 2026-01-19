@@ -2,10 +2,12 @@ const cron = require('node-cron');
 const supabase = require('../config/database');
 const { sendEmailReminder, sendSMSReminder, sendWhatsAppReminder, sendDailySummary } = require('./notifications');
 
-// Schedule daily reminder processing at 9 AM
-cron.schedule('0 9 * * *', async () => {
-  console.log('🔄 Running daily reminder processing...');
-  await processDailyReminders();
+console.log('📅 Scheduler module loaded');
+
+// ✅ Process reminders every 5 minutes (or every minute for more precision)
+cron.schedule('*/5 * * * *', async () => {
+  console.log('🔄 Running scheduled reminder check...');
+  await processDueReminders();
 });
 
 // Schedule daily summary emails at 6 PM
@@ -14,12 +16,14 @@ cron.schedule('0 18 * * *', async () => {
   await sendDailySummaries();
 });
 
-// Process daily reminders
-const processDailyReminders = async () => {
+// ✅ NEW: Process reminders that are due NOW (not just today)
+const processDueReminders = async () => {
   try {
-    const today = new Date().toISOString().split('T')[0];
+    const now = new Date().toISOString();
     
-    // Get all pending reminders for today
+    console.log(`⏰ Checking for reminders due at or before: ${now}`);
+    
+    // Get all pending reminders where scheduled_date <= now
     const { data: reminders, error } = await supabase
       .from('reminders')
       .select(`
@@ -32,133 +36,170 @@ const processDailyReminders = async () => {
           preferred_contact_method
         )
       `)
-      .eq('scheduled_date', today)
-      .eq('status', 'pending');
+      .lte('scheduled_date', now)
+      .eq('status', 'pending')
+      .order('scheduled_date', { ascending: true });
 
     if (error) {
-      console.error('Error fetching reminders:', error);
+      console.error('❌ Error fetching reminders:', error);
       return;
     }
 
-    console.log(`📅 Found ${reminders.length} reminders to process`);
+    const reminderCount = reminders?.length || 0;
+    console.log(`📅 Found ${reminderCount} reminder(s) to process`);
 
-    for (const reminder of reminders) {
-      try {
-        const patient = reminder.patients;
-        let notificationResult;
-        let success = false;
-
-        // Determine contact method (use reminder method or patient preference)
-        const contactMethod = reminder.contact_method || patient.preferred_contact_method;
-
-        switch (contactMethod) {
-          case 'email':
-            if (patient.email) {
-              notificationResult = await sendEmailReminder(patient.email, reminder.message, patient.name);
-              success = true;
-            } else {
-              console.log(`⚠️ No email for patient ${patient.name}`);
-            }
-            break;
-
-          case 'sms':
-            if (patient.phone) {
-              notificationResult = await sendSMSReminder(patient.phone, reminder.message);
-              success = true;
-            } else {
-              console.log(`⚠️ No phone for patient ${patient.name}`);
-            }
-            break;
-
-          case 'whatsapp':
-            if (patient.phone) {
-              notificationResult = await sendWhatsAppReminder(patient.phone, reminder.message);
-              success = true;
-            } else {
-              console.log(`⚠️ No phone for patient ${patient.name}`);
-            }
-            break;
-
-          default:
-            console.log(`⚠️ Unknown contact method: ${contactMethod}`);
-        }
-
-        if (success) {
-          // Update reminder status
-          await supabase
-            .from('reminders')
-            .update({
-              status: 'sent',
-              sent_at: new Date().toISOString()
-            })
-            .eq('id', reminder.id);
-
-          // Log notification
-          await supabase
-            .from('notification_logs')
-            .insert({
-              reminder_id: reminder.id,
-              patient_id: patient.id,
-              clinic_id: reminder.clinic_id,
-              notification_type: contactMethod,
-              recipient: contactMethod === 'email' ? patient.email : patient.phone,
-              message: reminder.message,
-              status: 'sent',
-              external_id: notificationResult?.id || notificationResult?.sid
-            });
-
-          console.log(`✅ Sent ${contactMethod} reminder to ${patient.name}`);
-        } else {
-          // Mark as failed
-          await supabase
-            .from('reminders')
-            .update({ status: 'failed' })
-            .eq('id', reminder.id);
-
-          // Log failed notification
-          await supabase
-            .from('notification_logs')
-            .insert({
-              reminder_id: reminder.id,
-              patient_id: patient.id,
-              clinic_id: reminder.clinic_id,
-              notification_type: contactMethod,
-              recipient: contactMethod === 'email' ? patient.email : patient.phone,
-              message: reminder.message,
-              status: 'failed',
-              error_message: 'No contact information available'
-            });
-
-          console.log(`❌ Failed to send reminder to ${patient.name}`);
-        }
-      } catch (error) {
-        console.error(`Error processing reminder ${reminder.id}:`, error);
-        
-        // Mark as failed
-        await supabase
-          .from('reminders')
-          .update({ status: 'failed' })
-          .eq('id', reminder.id);
-
-        // Log error
-        await supabase
-          .from('notification_logs')
-          .insert({
-            reminder_id: reminder.id,
-            patient_id: reminder.patients.id,
-            clinic_id: reminder.clinic_id,
-            notification_type: reminder.contact_method,
-            recipient: reminder.contact_method === 'email' ? reminder.patients.email : reminder.patients.phone,
-            message: reminder.message,
-            status: 'failed',
-            error_message: error.message
-          });
-      }
+    if (!reminders || reminderCount === 0) {
+      console.log('✅ No pending reminders due at this time');
+      return;
     }
 
-    console.log('✅ Daily reminder processing completed');
+    // Process each reminder
+    for (const reminder of reminders) {
+      await processReminder(reminder);
+    }
+
+    console.log('✅ Reminder processing completed');
   } catch (error) {
-    console.error('Error in processDailyReminders:', error);
+    console.error('❌ Error in processDueReminders:', error);
+  }
+};
+
+// Update the processReminder function in scheduler.js to pass reminderId
+const processReminder = async (reminder) => {
+  try {
+    const patient = reminder.patients;
+    
+    if (!patient) {
+      console.error(`❌ No patient data for reminder ${reminder.id}`);
+      return;
+    }
+
+    let notificationResult;
+    let success = false;
+
+    // Determine contact method
+    const contactMethod = reminder.contact_method || patient.preferred_contact_method;
+
+    console.log(`📤 Sending ${contactMethod} reminder to ${patient.name}...`);
+
+    switch (contactMethod) {
+      case 'email':
+        if (patient.email) {
+          // ✅ FIXED: Pass reminder.id to sendEmailReminder
+          notificationResult = await sendEmailReminder(
+            patient.email, 
+            reminder.message, 
+            patient.name,
+            reminder.id  // <- ADD THIS
+          );
+          success = true;
+        } else {
+          console.log(`⚠️ No email for patient ${patient.name}`);
+        }
+        break;
+
+      case 'sms':
+        if (patient.phone) {
+          // ✅ FIXED: Pass reminder.id to sendSMSReminder
+          notificationResult = await sendSMSReminder(
+            patient.phone, 
+            reminder.message,
+            reminder.id  // <- ADD THIS
+          );
+          success = true;
+        } else {
+          console.log(`⚠️ No phone for patient ${patient.name}`);
+        }
+        break;
+
+      case 'whatsapp':
+        if (patient.phone) {
+          // ✅ FIXED: Pass reminder.id to sendWhatsAppReminder
+          notificationResult = await sendWhatsAppReminder(
+            patient.phone, 
+            reminder.message,
+            reminder.id  // <- ADD THIS
+          );
+          success = true;
+        } else {
+          console.log(`⚠️ No phone for patient ${patient.name}`);
+        }
+        break;
+
+      default:
+        console.log(`⚠️ Unknown contact method: ${contactMethod}`);
+    }
+
+    if (success) {
+      // Update reminder status
+      await supabase
+        .from('reminders')
+        .update({
+          status: 'sent',
+          sent_at: new Date().toISOString()
+        })
+        .eq('id', reminder.id);
+
+      // Log notification
+      await supabase
+        .from('notification_logs')
+        .insert({
+          reminder_id: reminder.id,
+          patient_id: patient.id,
+          clinic_id: reminder.clinic_id,
+          notification_type: contactMethod,
+          recipient: contactMethod === 'email' ? patient.email : patient.phone,
+          message: reminder.message,
+          status: 'sent',
+          external_id: notificationResult?.id || notificationResult?.sid || notificationResult?.messageId
+        });
+
+      console.log(`✅ Sent ${contactMethod} reminder to ${patient.name}`);
+    } else {
+      // Mark as failed
+      await supabase
+        .from('reminders')
+        .update({ status: 'failed' })
+        .eq('id', reminder.id);
+
+      // Log failed notification
+      await supabase
+        .from('notification_logs')
+        .insert({
+          reminder_id: reminder.id,
+          patient_id: patient.id,
+          clinic_id: reminder.clinic_id,
+          notification_type: contactMethod,
+          recipient: contactMethod === 'email' ? patient.email : patient.phone,
+          message: reminder.message,
+          status: 'failed',
+          error_message: 'No contact information available'
+        });
+
+      console.log(`❌ Failed to send reminder to ${patient.name}`);
+    }
+  } catch (error) {
+    console.error(`❌ Error processing reminder ${reminder.id}:`, error);
+    
+    // Mark as failed
+    await supabase
+      .from('reminders')
+      .update({ status: 'failed' })
+      .eq('id', reminder.id);
+
+    // Log error
+    await supabase
+      .from('notification_logs')
+      .insert({
+        reminder_id: reminder.id,
+        patient_id: reminder.patients?.id,
+        clinic_id: reminder.clinic_id,
+        notification_type: reminder.contact_method,
+        recipient: reminder.contact_method === 'email' ? reminder.patients?.email : reminder.patients?.phone,
+        message: reminder.message,
+        status: 'failed',
+        error_message: error.message
+      });
   }
 };
 
@@ -324,7 +365,8 @@ const cleanupOldLogs = async () => {
 };
 
 module.exports = {
-  processDailyReminders,
+  processDueReminders,
+  processReminder,
   sendDailySummaries,
   processOverdueFollowUps,
   cleanupOldLogs

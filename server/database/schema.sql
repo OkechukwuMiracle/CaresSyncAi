@@ -131,6 +131,27 @@ CREATE TABLE IF NOT EXISTS ai_insights (
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_patients_clinic_id ON patients(clinic_id);
 CREATE INDEX IF NOT EXISTS idx_patients_next_follow_up ON patients(next_follow_up_date);
+CREATE INDEX IF NOT EXISTS idx_reminders_scheduled_status_pending 
+ON reminders (scheduled_date, status)
+WHERE status = 'pending';
+
+CREATE INDEX IF NOT EXISTS idx_reminders_clinic_scheduled 
+ON reminders (clinic_id, scheduled_date);
+
+CREATE INDEX IF NOT EXISTS idx_reminders_patient_scheduled 
+ON reminders (patient_id, scheduled_date DESC);
+
+CREATE INDEX IF NOT EXISTS idx_notification_logs_clinic_sent 
+ON notification_logs (clinic_id, sent_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_patients_clinic_next_followup 
+ON patients (clinic_id, next_follow_up_date)
+WHERE is_active = true AND next_follow_up_date IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_clinics_subscription_status 
+ON clinics (subscription_status)
+WHERE subscription_status = 'active';
+
 CREATE INDEX IF NOT EXISTS idx_reminders_patient_id ON reminders(patient_id);
 CREATE INDEX IF NOT EXISTS idx_reminders_scheduled_date ON reminders(scheduled_date);
 CREATE INDEX IF NOT EXISTS idx_reminders_status ON reminders(status);
@@ -146,7 +167,14 @@ INSERT INTO subscription_plans (name, display_name, price_monthly, price_yearly,
 ('basic', 'Basic Plan', 19.00, 190.00, 100, 500, '{"email_reminders": true, "sms_reminders": true, "ai_insights": true, "support": "email"}'),
 ('pro', 'Pro Plan', 49.00, 490.00, 500, 2000, '{"email_reminders": true, "sms_reminders": true, "whatsapp_reminders": true, "ai_insights": true, "advanced_analytics": true, "support": "priority"}'),
 ('enterprise', 'Enterprise Plan', 99.00, 990.00, -1, -1, '{"email_reminders": true, "sms_reminders": true, "whatsapp_reminders": true, "ai_insights": true, "advanced_analytics": true, "custom_integrations": true, "support": "dedicated", "white_label": true}')
-ON CONFLICT (name) DO NOTHING;
+ON CONFLICT (name) DO UPDATE SET
+    display_name = EXCLUDED.display_name,
+    price_monthly = EXCLUDED.price_monthly,
+    price_yearly = EXCLUDED.price_yearly,
+    max_patients = EXCLUDED.max_patients,
+    max_reminders_per_month = EXCLUDED.max_reminders_per_month,
+    features = EXCLUDED.features,
+    is_active = true;
 
 -- Create or replace the updated_at trigger function
 CREATE OR REPLACE FUNCTION update_updated_at_column()
